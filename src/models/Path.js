@@ -43,3 +43,4 @@ const PathSchema = new mongoose.Schema({
 
 const Path = mongoose.model("Path", PathSchema);
 export { Path };
+ 

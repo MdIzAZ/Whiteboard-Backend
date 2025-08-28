@@ -1,5 +1,5 @@
 import express from 'express';
-import {getUserWhiteboards,getWhiteboardById} from '../controllers/whiteboardController.js';
+import {deleteWhiteboardById, fetchAllPathsOfAWhiteboard, getUserWhiteboards,getWhiteboardById} from '../controllers/whiteboardController.js';
 
 import authenticateToken from '../middlewares/authMiddleware.js';
 
@@ -10,5 +10,11 @@ router.get('/my', authenticateToken, getUserWhiteboards);
 
 //Get a specific whiteboard by whiteboardId ( name as roomId in Frontend)
 router.get('/:whiteboardId', authenticateToken, getWhiteboardById);
+
+
+router.delete('/:whiteboardId', authenticateToken, deleteWhiteboardById)
+
+router.get('/:whiteboardId/paths', authenticateToken, fetchAllPathsOfAWhiteboard)
+
 
 export default router;

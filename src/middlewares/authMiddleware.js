@@ -10,7 +10,8 @@ const authenticateToken = (req, res, next) => {
 
     jwt.verify(token, process.env.JWT_SECRET, (err, decodedUser) => {
         if (err) {
-            return res.status(403).json({ message: 'Invalid token' });
+            console.error('Invalid Token', err);
+            return res.status(401).json({ message: 'Invalid token' });
         }
 
         // Attach decoded payload to request

@@ -1,5 +1,6 @@
 import { Whiteboard } from "../models/Whiteboard.js";
 import { Path } from "../models/Path.js";
+import User from "../models/User.js";
 
 
 const userSocketMap = new Map();
@@ -20,11 +21,16 @@ const handleSocketEvents = (io, socket) => {
 
 
 
-    socket.on("join-room", async(roomId, callback) => {
+    socket.on("join-room", async(roomId, userId, callback) => {
         try {
-            socket.join(roomId);
-            if(typeof callback === "function") {
-                callback("joined")
+            console.log(`User ${userId} `);
+            const existingUser = await User.findOne({ _id: userId });
+
+            if (!existingUser) {
+                if (typeof callback === "function") {
+                    callback("User Not Found");
+                }
+                return;
             }
 
             const existing = await Whiteboard.findOne({ whiteboardId: roomId });
@@ -34,7 +40,19 @@ const handleSocketEvents = (io, socket) => {
                     name: 'Whiteboard-' + Math.random().toString(36).substring(2, 8)
                 });
                 await whiteboard.save();
+            } 
+
+            if (!existingUser.roomIds.includes(roomId)) {
+                existingUser.roomIds.push(roomId);
+                await existingUser.save();
             }
+
+            socket.join(roomId);
+            if (typeof callback === "function") {
+                callback("joined")
+            }
+
+            
 
             console.log(`Socket ${socket.id} joined ${roomId}`);
         } catch (error) {
@@ -105,6 +123,10 @@ const handleSocketEvents = (io, socket) => {
         }
     });
 };
+
+
+
+
 
 export {
     handleSocketEvents,

@@ -9,7 +9,7 @@ const generateAccessToken = (user) => {
     return jwt.sign(
         { userId: user._id, username: user.username },
         process.env.JWT_SECRET,
-        { expiresIn: '15m' }  // Short-lived
+        { expiresIn: '1d' }  // Short-lived
     );
 };
 
@@ -117,6 +117,9 @@ const loginUser = async (req, res) => {
 
 
 const refreshAccessToken = async (req, res) => {
+
+    console.log("Refresh token request received");
+
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
@@ -142,8 +145,7 @@ const refreshAccessToken = async (req, res) => {
 
         return res.status(200).json({
             accessToken: newAccessToken,
-            refreshToken: newRefreshToken,  // return new refresh token
-            user: { id: user._id, username: user.username }
+            refreshToken: newRefreshToken
         });
 
     } catch (err) {

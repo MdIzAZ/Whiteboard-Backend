@@ -1,3 +1,4 @@
+import { Path } from '../models/Path.js';
 import User from '../models/User.js';
 import { Whiteboard } from '../models/Whiteboard.js';
 
@@ -40,3 +41,55 @@ export const getWhiteboardById = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+
+export const deleteWhiteboardById = async (req, res) => {
+    try {
+        console.log("Req made")
+        const { whiteboardId } = req.params;
+        const userId = req.user.userId; 
+
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log("User not found with ID:", userId);
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const whiteboard = await Whiteboard.findOneAndDelete( {whiteboardId} );
+
+        if (!whiteboard) {
+            console.log("Whiteboard not found with ID:", whiteboardId);
+            return res.status(404).json({ message: "Whiteboard not found" });
+        }
+
+        user.roomIds = user.roomIds.filter(id => id !== whiteboardId);
+        await user.save();
+
+        res.status(200).json({ message: "Whiteboard deleted successfully" });
+
+
+
+    } catch(err) {
+        console.error("Error deleting whiteboard:", err.message);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+
+export const fetchAllPathsOfAWhiteboard = async (req, res) => {
+
+    try {
+
+        const { whiteboardId } = req.params;
+        const paths = await Path.find({ whiteboardId });
+        res.status(200).json({ paths: paths });
+        
+    } catch (error) {
+
+        console.error("Error fetching paths:", error);
+        res.status(500).json({ message: "Internal server error" });
+        
+    }
+
+}
