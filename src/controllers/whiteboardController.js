@@ -49,19 +49,28 @@ export const deleteWhiteboardById = async (req, res) => {
         const { whiteboardId } = req.params;
         const userId = req.user.userId; 
 
+        // 1. find user
         const user = await User.findById(userId);
         if (!user) {
             console.log("User not found with ID:", userId);
             return res.status(404).json({ message: "User not found" });
         }
 
-        const whiteboard = await Whiteboard.findOneAndDelete( {whiteboardId} );
+        const whiteboard = await Whiteboard.findOne( {whiteboardId} );
 
         if (!whiteboard) {
             console.log("Whiteboard not found with ID:", whiteboardId);
             return res.status(404).json({ message: "Whiteboard not found" });
         }
 
+        // 2. If only one user is on the whiteboard, delete all paths and the whiteboard itself 
+        const noOfUsersOnWhiteboard = await User.countDocuments( { roomIds: whiteboardId } );
+        if (noOfUsersOnWhiteboard <= 1) {
+            await Path.deleteMany({ whiteboardId });
+            await Whiteboard.deleteOne({ whiteboardId });
+        }
+
+        // 3. Remove the whiteboardId from the user's roomIds
         user.roomIds = user.roomIds.filter(id => id !== whiteboardId);
         await user.save();
 
