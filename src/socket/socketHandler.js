@@ -93,6 +93,16 @@ const handleSocketEvents = (io, socket) => {
 
     socket.on('erase', async(data)=>{
 
+        try {
+            const pathsIds = data.pathsIds
+            await Path.deleteMany({ pathId: { $in: pathsIds } });
+            console.log(`Erased paths:`, pathsIds);
+            socket.to(data.roomId).emit("erase", pathsIds);
+
+        } catch (error) {
+            console.error("Failed to erase paths:", error);
+            socket.emit("error", { type: "ERASE_FAILED", message: "Erase operation failed!" });
+        }
 
     })
 
