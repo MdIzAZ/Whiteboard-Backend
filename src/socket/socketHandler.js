@@ -1,127 +1,101 @@
-import { Whiteboard } from "../models/Whiteboard.js";
+import { Board } from "../models/Board.js";
 import { Path } from "../models/Path.js";
 import User from "../models/User.js";
-
 
 const userSocketMap = new Map();
 
 const handleSocketEvents = (io, socket) => {
     console.log('User connected:', socket.id);
-    socket.broadcast.emit('message', `${socket.id} has joined the chat`);
 
     socket.on('register', (userId) => {
         userSocketMap.set(userId, socket.id);
         console.log(`Registered ${userId} → ${socket.id}`);
     });
 
-    socket.on('sendMessage', (message) => {
-        console.log('Message received:', message);
-        socket.broadcast.emit('received-message', message);
-    });
-
-
-
-    socket.on("join-room", async(roomId, userId, callback) => {
+    // Join the live room for a board. The board must already be registered on
+    // the server (via POST /api/boards when it was published) — we no longer
+    // auto-create boards from a join. Joining also records membership so the
+    // board shows up in GET /api/boards/mine.
+    socket.on("join", async (boardId, userId, callback) => {
         try {
-            console.log(`User ${userId} `);
-            const existingUser = await User.findOne({ _id: userId });
-
-            if (!existingUser) {
-                if (typeof callback === "function") {
-                    callback("User Not Found");
-                }
+            const user = await User.findById(userId);
+            if (!user) {
+                if (typeof callback === "function") callback("user-not-found");
                 return;
             }
 
-            const existing = await Whiteboard.findOne({ whiteboardId: roomId });
-            if (!existing) {
-                const whiteboard = new Whiteboard({
-                    whiteboardId: roomId,
-                    name: 'Whiteboard-' + Math.random().toString(36).substring(2, 8)
-                });
-                await whiteboard.save();
-            } 
-
-            if (!existingUser.roomIds.includes(roomId)) {
-                existingUser.roomIds.push(roomId);
-                await existingUser.save();
+            const board = await Board.findOne({ boardId });
+            if (!board) {
+                if (typeof callback === "function") callback("board-not-found");
+                return;
             }
 
-            socket.join(roomId);
-            if (typeof callback === "function") {
-                callback("joined")
+            if (!user.boardIds.includes(boardId)) {
+                await User.updateOne({ _id: userId }, { $addToSet: { boardIds: boardId } });
             }
 
-            
-
-            console.log(`Socket ${socket.id} joined ${roomId}`);
+            socket.join(boardId);
+            if (typeof callback === "function") callback("joined");
+            console.log(`Socket ${socket.id} joined board ${boardId}`);
         } catch (error) {
-            if (typeof callback === "function") {
-                callback("error");
-            }
-            console.error(`Error joining room ${roomId}:`, error);
+            console.error(`Error joining board ${boardId}:`, error);
+            if (typeof callback === "function") callback("error");
         }
     });
 
-
+    // Persist a single drawn path (scoped to its board) and mirror it to peers.
     socket.on("draw", async (data) => {
         try {
-            const { roomId, pathData } = data;
+            const { boardId, pathData } = data;
 
-            const path = new Path(
+            await Path.updateOne(
+                { boardId, pathId: pathData.pathId },
                 {
-                    whiteboardId: roomId,
-                    pathId: pathData.pathId,
-                    pathString: pathData.path,
-                    drawingTool: pathData.drawingTool,
-                    strokeWidth: pathData.strokeWidth,
-                    opacity: pathData.opacity || 1,
-                    strokeColor: pathData.strokeColor || null,
-                    fillColor: pathData.fillColor || null
-                }
-            )
+                    $setOnInsert: {
+                        boardId,
+                        pathId: pathData.pathId,
+                        pathString: pathData.path ?? pathData.pathString,
+                        drawingTool: pathData.drawingTool,
+                        strokeWidth: pathData.strokeWidth,
+                        opacity: pathData.opacity ?? 1,
+                        strokeColor: pathData.strokeColor ?? null,
+                        fillColor: pathData.fillColor ?? null
+                    }
+                },
+                { upsert: true }
+            );
 
-            console.log(`Drawing data received for room ${roomId}:`, pathData);
-            const savedPath = await path.save();
-
-            socket.to(roomId).emit("draw", pathData);
+            socket.to(boardId).emit("draw", pathData);
         } catch (err) {
             console.error("Failed to save drawing:", err);
             socket.emit("error", { type: "SAVE_FAILED", message: "Drawing not saved!" });
         }
     });
 
-    socket.on('erase', async(data)=>{
-
+    // Erase paths — scoped to the board so it can never touch another board's
+    // paths that happen to share a pathId.
+    socket.on('erase', async (data) => {
         try {
-            const pathsIds = data.pathsIds
-            await Path.deleteMany({ pathId: { $in: pathsIds } });
-            console.log(`Erased paths:`, pathsIds);
-            socket.to(data.roomId).emit("erase", pathsIds);
-
+            const { boardId, pathIds } = data;
+            await Path.deleteMany({ boardId, pathId: { $in: pathIds } });
+            socket.to(boardId).emit("erase", pathIds);
+            console.log(`Erased ${pathIds?.length ?? 0} paths on board ${boardId}`);
         } catch (error) {
             console.error("Failed to erase paths:", error);
             socket.emit("error", { type: "ERASE_FAILED", message: "Erase operation failed!" });
         }
-
-    })
-
-
-    socket.on("leave-room", (roomId, callback) => {
-        try {
-            socket.leave(roomId);
-            if (typeof callback === "function") {
-                callback("left");
-            }
-            console.log(`Socket ${socket.id} left room ${roomId}`);
-        } catch (error) {
-            if (typeof callback === "function") {
-                callback("error");
-            }
-            console.error(`Error leaving room ${roomId}:`, error);
-        }
     });
 
+    socket.on("leave", (boardId, callback) => {
+        try {
+            socket.leave(boardId);
+            if (typeof callback === "function") callback("left");
+            console.log(`Socket ${socket.id} left board ${boardId}`);
+        } catch (error) {
+            console.error(`Error leaving board ${boardId}:`, error);
+            if (typeof callback === "function") callback("error");
+        }
+    });
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
@@ -134,11 +108,7 @@ const handleSocketEvents = (io, socket) => {
     });
 };
 
-
-
-
-
 export {
     handleSocketEvents,
     userSocketMap
-}
+};

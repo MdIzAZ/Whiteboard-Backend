@@ -3,7 +3,7 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { handleSocketEvents } from './socket/socketHandler.js';
 import authRoute from './routes/authRoute.js'
-import whiteboardRoute from './routes/whiteboardRoute.js';
+import boardRoute from './routes/boardRoute.js';
 import cors from 'cors';
 
 
@@ -30,7 +30,7 @@ app.get('/', (req, res) => {
 })
 
 app.use('/api/auth', authRoute);
-app.use('/api/whiteboard', whiteboardRoute);
+app.use('/api/boards', boardRoute);
 
 
 

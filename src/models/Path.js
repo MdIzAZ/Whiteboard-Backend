@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const PathSchema = new mongoose.Schema({
-    whiteboardId: { // actually roomId in the frontend
+    boardId: {
         type: String,
         required: true,
         index: true
@@ -38,9 +38,10 @@ const PathSchema = new mongoose.Schema({
     }
 });
 
-// Composite uniqueness: (whiteboardId + pathId)
-// PathSchema.index({ whiteboardId: 1, pathId: 1 }, { unique: true });
+// A pathId is unique *within* a board. This makes erase safe (it can never
+// cross boards) and makes re-sync idempotent (the same path can't be inserted
+// twice), which is what the offline outbox flush relies on.
+PathSchema.index({ boardId: 1, pathId: 1 }, { unique: true });
 
 const Path = mongoose.model("Path", PathSchema);
 export { Path };
- 

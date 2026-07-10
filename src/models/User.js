@@ -13,9 +13,10 @@ const userSchema = new Schema({
         type: String,
         required: true
     },
-    roomIds: [{
-        type: String, // referencing Whiteboard.id (custom)
-        ref: 'Whiteboard'
+    // Boards this user is a member of, by boardId (the shared UUID).
+    boardIds: [{
+        type: String,
+        ref: 'Board'
     }],
     refreshToken: {
         type: String,
